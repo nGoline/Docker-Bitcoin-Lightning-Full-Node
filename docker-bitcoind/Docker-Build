@@ -1,0 +1,51 @@
+# We will use Ubuntu 16.04 to run our node
+FROM ubuntu:16.04
+
+# Get the tools needed to build bitcoin
+RUN apt-get update
+RUN apt-get install -y build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils python3 git
+RUN apt-get install -y libboost-system-dev libboost-filesystem-dev libboost-chrono-dev libboost-program-options-dev libboost-test-dev libboost-thread-dev
+
+# Add db4.8 repository
+RUN apt-get install -y software-properties-common
+RUN add-apt-repository ppa:bitcoin/bitcoin
+RUN apt-get update
+RUN apt-get install -y libdb4.8-dev libdb4.8++-dev
+
+# Set the working dir to home CHANGE TO HOME!
+WORKDIR /home/bitcoind
+
+# Clone bitcoin and change the version to 0.16
+RUN git clone https://github.com/bitcoin/bitcoin.git
+WORKDIR /home/bitcoind/bitcoin
+RUN ls
+RUN git checkout 0.16
+
+# Make and install it
+RUN ./autogen.sh
+RUN ./configure
+RUN make
+RUN make install
+
+# Set the working dir
+WORKDIR /home/bitcoind
+
+# Copy bitcoin.conf
+RUN mkdir /home/bitcoind/node
+ADD node/. /home/bitcoind/node
+
+# Starting bicoin daemon
+RUN bitcoind -datadir=node -daemon
+
+# Set bitcoind to run on start-up
+RUN echo "" >>! /var/spool/crontab/root
+RUN crontab -l | { cat; echo "@reboot bitcoind -datadir=node -daemon"; } | crontab -
+
+# EXPOSE rpc port for the node to allow outside container access
+EXPOSE 12001
+
+# Starting bicoin daemon
+RUN bitcoind -datadir=node -daemon
+
+# Drop user into bash shell by default
+CMD ["/bin/bash"]
